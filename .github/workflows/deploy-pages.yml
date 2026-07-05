@@ -25,10 +25,29 @@ jobs:
         uses: actions/checkout@v4
       - name: Setup Pages
         uses: actions/configure-pages@v4
+      - name: Prepare Pages artifact
+        run: |
+          rm -rf .dist
+          mkdir -p .dist/simulation
+          cat > .dist/index.html <<'EOF'
+          <!doctype html>
+          <html lang="en">
+          <head>
+            <meta charset="utf-8">
+            <meta http-equiv="refresh" content="0; url=./simulation/">
+            <link rel="canonical" href="./simulation/">
+            <title>Smart Helmet Simulator</title>
+          </head>
+          <body>
+            <p>Redirecting to the <a href="./simulation/">live simulator</a>…</p>
+          </body>
+          </html>
+          EOF
+          cp -R simulation/. .dist/simulation/
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: 'simulation'
+          path: '.dist'
       - name: Deploy to GitHub Pages
         id: deployment
         uses: actions/deploy-pages@v4
