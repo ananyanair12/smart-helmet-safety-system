@@ -1,0 +1,361 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Smart Helmet — Live Simulator</title>
+<style>
+  :root{
+    --asphalt: #12151a;
+    --panel: #1a1e25;
+    --panel-line: #2a2f38;
+    --text: #e8eaed;
+    --dim: #8b93a1;
+    --amber: #ffb020;
+    --hazard: #e63946;
+    --visor: #4fd1c5;
+    --mono: 'JetBrains Mono', 'Space Mono', ui-monospace, monospace;
+    --sans: 'Inter', -apple-system, system-ui, sans-serif;
+  }
+  *{box-sizing:border-box;}
+  body{
+    margin:0;
+    background: radial-gradient(1200px 600px at 50% -10%, #1c2129 0%, var(--asphalt) 55%);
+    color:var(--text);
+    font-family:var(--sans);
+    min-height:100vh;
+    padding:32px 16px 64px;
+  }
+  .wrap{max-width:1040px;margin:0 auto;}
+
+  .eyebrow{
+    font-family:var(--mono);
+    font-size:12px;
+    letter-spacing:.14em;
+    text-transform:uppercase;
+    color:var(--visor);
+    display:flex;
+    align-items:center;
+    gap:8px;
+    margin-bottom:10px;
+  }
+  .eyebrow::before{content:"";width:7px;height:7px;border-radius:50%;background:var(--visor);box-shadow:0 0 10px var(--visor);}
+
+  h1{
+    font-size:clamp(28px,4vw,42px);
+    margin:0 0 6px;
+    letter-spacing:-0.01em;
+    font-weight:700;
+  }
+  .sub{color:var(--dim);font-size:15px;max-width:640px;line-height:1.55;margin:0 0 28px;}
+
+  .grid{
+    display:grid;
+    grid-template-columns: 300px 1fr;
+    gap:20px;
+  }
+  @media (max-width: 760px){ .grid{grid-template-columns:1fr;} }
+
+  .panel{
+    background:var(--panel);
+    border:1px solid var(--panel-line);
+    border-radius:14px;
+    padding:22px;
+  }
+
+  /* --- Helmet visual --- */
+  .helmet-stage{display:flex;flex-direction:column;align-items:center;gap:14px;}
+  .helmet-stage svg{width:100%;max-width:260px;}
+  .status-line{
+    font-family:var(--mono);
+    font-size:13px;
+    text-align:center;
+    color:var(--dim);
+    min-height:18px;
+  }
+  .status-line.alert-alcohol{color:var(--hazard);}
+  .status-line.alert-drowsy{color:var(--amber);}
+
+  .buzzer-badge{
+    font-family:var(--mono);
+    font-size:11px;
+    letter-spacing:.08em;
+    text-transform:uppercase;
+    padding:6px 10px;
+    border-radius:999px;
+    border:1px solid var(--panel-line);
+    color:var(--dim);
+  }
+  .buzzer-badge.on{border-color:var(--hazard);color:var(--hazard);background:rgba(230,57,70,.08);}
+  .buzzer-badge.on.drowsy{border-color:var(--amber);color:var(--amber);background:rgba(255,176,32,.08);}
+
+  /* --- Controls --- */
+  .control{margin-bottom:26px;}
+  .control:last-child{margin-bottom:0;}
+  .control-head{
+    display:flex;
+    justify-content:space-between;
+    align-items:baseline;
+    margin-bottom:10px;
+  }
+  .control-label{font-size:13px;font-weight:600;}
+  .control-value{
+    font-family:var(--mono);
+    font-size:13px;
+    color:var(--visor);
+  }
+  input[type=range]{
+    width:100%;
+    -webkit-appearance:none;
+    height:4px;
+    border-radius:2px;
+    background:var(--panel-line);
+    outline:none;
+  }
+  input[type=range]::-webkit-slider-thumb{
+    -webkit-appearance:none;
+    width:16px;height:16px;border-radius:50%;
+    background:var(--text);
+    border:3px solid var(--asphalt);
+    box-shadow:0 0 0 1px var(--panel-line);
+    cursor:pointer;
+    margin-top:-6px;
+  }
+  .scale-labels{
+    display:flex;justify-content:space-between;
+    font-family:var(--mono);font-size:10px;color:var(--dim);margin-top:6px;
+  }
+
+  /* --- Telemetry --- */
+  .telemetry{
+    grid-column: 1 / -1;
+    font-family:var(--mono);
+    font-size:12.5px;
+    color:#a9b1bd;
+    background:#0e1116;
+    border:1px solid var(--panel-line);
+    border-radius:14px;
+    padding:16px 18px;
+    height:150px;
+    overflow-y:auto;
+    line-height:1.65;
+  }
+  .telemetry .tag{color:var(--visor);}
+  .telemetry .tag.warn{color:var(--hazard);}
+  .telemetry .tag.caution{color:var(--amber);}
+
+  .legend{
+    display:flex;gap:18px;flex-wrap:wrap;margin-top:18px;
+    font-family:var(--mono);font-size:11.5px;color:var(--dim);
+  }
+  .legend span{display:inline-flex;align-items:center;gap:6px;}
+  .dot{width:8px;height:8px;border-radius:50%;display:inline-block;}
+
+  footer{
+    margin-top:28px;
+    font-family:var(--mono);
+    font-size:11.5px;
+    color:var(--dim);
+    text-align:center;
+  }
+  footer a{color:var(--visor);text-decoration:none;}
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <div class="eyebrow">Firmware Digital Twin</div>
+  <h1>Smart Helmet Simulator</h1>
+  <p class="sub">
+    Runs the same thresholds, filtering, and alert-priority logic as
+    <code>firmware/smart_helmet.ino</code> — drag the sliders to simulate the
+    MQ-3 breath sensor and the MPU6050 head-tilt reading, and watch the
+    detection engine decide in real time.
+  </p>
+
+  <div class="grid">
+    <div class="panel helmet-stage">
+      <svg viewBox="0 0 200 200" fill="none">
+        <path d="M100 20 C50 20 25 60 25 105 L25 150 C25 160 33 168 43 168 L157 168 C167 168 175 160 175 150 L175 105 C175 60 150 20 100 20 Z"
+              fill="#20242c" stroke="#333a45" stroke-width="2"/>
+        <rect x="45" y="95" width="110" height="45" rx="10" fill="#0e1116" stroke="#333a45" stroke-width="2"/>
+        <circle id="ledRed" cx="70" cy="117" r="9" fill="#3a1418" />
+        <circle id="ledYellow" cx="130" cy="117" r="9" fill="#3a2f10" />
+        <rect x="20" y="145" width="160" height="10" rx="5" fill="#171a20"/>
+      </svg>
+      <div class="status-line" id="statusLine">System nominal — monitoring</div>
+      <div class="buzzer-badge" id="buzzerBadge">Buzzer idle</div>
+    </div>
+
+    <div class="panel">
+      <div class="control">
+        <div class="control-head">
+          <span class="control-label">MQ-3 alcohol sensor (raw ADC)</span>
+          <span class="control-value" id="mq3Val">0</span>
+        </div>
+        <input type="range" id="mq3Slider" min="0" max="1023" value="0" step="1">
+        <div class="scale-labels"><span>0</span><span>512</span><span>1023</span></div>
+      </div>
+
+      <div class="control">
+        <div class="control-head">
+          <span class="control-label">Head pitch — forward nod (°)</span>
+          <span class="control-value" id="pitchVal">0°</span>
+        </div>
+        <input type="range" id="pitchSlider" min="0" max="360" value="0" step="1">
+        <div class="scale-labels"><span>0°</span><span>180°</span><span>360°</span></div>
+      </div>
+
+      <div class="control">
+        <div class="control-head">
+          <span class="control-label">Head roll — side drop (°)</span>
+          <span class="control-value" id="rollVal">0°</span>
+        </div>
+        <input type="range" id="rollSlider" min="0" max="360" value="0" step="1">
+        <div class="scale-labels"><span>0°</span><span>180°</span><span>360°</span></div>
+      </div>
+    </div>
+
+    <div class="telemetry" id="telemetry"></div>
+  </div>
+
+  <div class="legend">
+    <span><span class="dot" style="background:var(--hazard)"></span> Red LED — alcohol (BAC ≥ 0.08%), Priority 1</span>
+    <span><span class="dot" style="background:var(--amber)"></span> Yellow LED — drowsiness, Priority 2</span>
+    <span><span class="dot" style="background:var(--visor)"></span> Visor cyan — nominal / safe state</span>
+  </div>
+
+  <footer>
+    Source: <a href="../firmware/smart_helmet.ino">firmware/smart_helmet.ino</a> ·
+    EPICS346 Smart Helmet for Safety Applications
+  </footer>
+</div>
+
+<script>
+// ---- Mirrors the constants and logic in firmware/smart_helmet.ino ----
+const BAC_THRESHOLD = 0.08;
+const DROWSY_CONFIRM_TICKS = 15;   // 1.5s at 100ms sampling
+const PITCH_FORWARD_MIN = 319, PITCH_FORWARD_MAX = 360;
+const ROLL_RIGHT_MIN = 40, ROLL_RIGHT_MAX = 70;
+const ROLL_LEFT_MIN = 310, ROLL_LEFT_MAX = 340;
+
+let alcoholReadings = new Array(10).fill(0);
+let alcoholIndex = 0;
+let alcoholDetected = false;
+let drowsinessCounter = 0;
+let isDrowsinessAlertActive = false;
+let lastDrowsyTick = 0;
+
+const mq3Slider = document.getElementById('mq3Slider');
+const pitchSlider = document.getElementById('pitchSlider');
+const rollSlider = document.getElementById('rollSlider');
+const mq3Val = document.getElementById('mq3Val');
+const pitchVal = document.getElementById('pitchVal');
+const rollVal = document.getElementById('rollVal');
+const ledRed = document.getElementById('ledRed');
+const ledYellow = document.getElementById('ledYellow');
+const statusLine = document.getElementById('statusLine');
+const buzzerBadge = document.getElementById('buzzerBadge');
+const telemetry = document.getElementById('telemetry');
+
+function log(msg, cls){
+  const line = document.createElement('div');
+  if(cls) line.innerHTML = `<span class="tag ${cls}">›</span> ${msg}`;
+  else line.innerHTML = `<span class="tag">›</span> ${msg}`;
+  telemetry.appendChild(line);
+  telemetry.scrollTop = telemetry.scrollHeight;
+  while(telemetry.childNodes.length > 40) telemetry.removeChild(telemetry.firstChild);
+}
+
+function checkAlcohol(rawValue){
+  alcoholReadings[alcoholIndex] = rawValue;
+  alcoholIndex = (alcoholIndex + 1) % 10;
+  const filtered = alcoholReadings.reduce((a,b)=>a+b,0) / 10;
+  let bac = (filtered * 0.0008) - 0.05;
+  if (bac < 0) bac = 0;
+
+  const wasDetected = alcoholDetected;
+  alcoholDetected = bac >= BAC_THRESHOLD;
+  if (alcoholDetected && !wasDetected){
+    log(`ALCOHOL DETECTED — BAC ${bac.toFixed(3)}% ≥ 0.08% threshold. Red LED + continuous buzzer.`, 'warn');
+  } else if (!alcoholDetected && wasDetected){
+    log(`Alcohol level cleared — BAC ${bac.toFixed(3)}%.`);
+  }
+  return bac;
+}
+
+function checkDrowsiness(pitch, roll){
+  const matches =
+    (pitch >= PITCH_FORWARD_MIN && pitch <= PITCH_FORWARD_MAX) ||
+    (roll  >= ROLL_RIGHT_MIN    && roll  <= ROLL_RIGHT_MAX)    ||
+    (roll  >= ROLL_LEFT_MIN     && roll  <= ROLL_LEFT_MAX);
+
+  const wasActive = isDrowsinessAlertActive;
+  if (matches){
+    drowsinessCounter++;
+    if (drowsinessCounter >= DROWSY_CONFIRM_TICKS){
+      isDrowsinessAlertActive = true;
+    }
+  } else {
+    drowsinessCounter = 0;
+    isDrowsinessAlertActive = false;
+  }
+
+  if (isDrowsinessAlertActive && !wasActive){
+    const pattern = pitch >= PITCH_FORWARD_MIN ? 'forward head nod' : (roll <= ROLL_RIGHT_MAX && roll >= ROLL_RIGHT_MIN ? 'right-side head drop' : 'left-side head drop');
+    log(`DROWSINESS DETECTED — sustained ${pattern} (pitch ${pitch.toFixed(0)}°, roll ${roll.toFixed(0)}°). Yellow LED + intermittent buzzer.`, 'caution');
+  } else if (!isDrowsinessAlertActive && wasActive){
+    log(`Head position normalized — drowsiness alert cleared.`);
+  }
+  return matches;
+}
+
+function render(){
+  const raw = parseInt(mq3Slider.value, 10);
+  const pitch = parseInt(pitchSlider.value, 10);
+  const roll = parseInt(rollSlider.value, 10);
+
+  mq3Val.textContent = raw;
+  pitchVal.textContent = pitch + '°';
+  rollVal.textContent = roll + '°';
+
+  const bac = checkAlcohol(raw);
+  checkDrowsiness(pitch, roll);
+
+  // LED + status rendering, alcohol takes priority (matches firmware updateAlerts())
+  if (alcoholDetected){
+    ledRed.setAttribute('fill', '#ff4d5a');
+    ledRed.style.filter = 'drop-shadow(0 0 8px #ff4d5a)';
+    ledYellow.setAttribute('fill', '#3a2f10');
+    ledYellow.style.filter = 'none';
+    statusLine.textContent = `ALCOHOL ALERT — BAC ${bac.toFixed(3)}%`;
+    statusLine.className = 'status-line alert-alcohol';
+    buzzerBadge.textContent = 'Buzzer: continuous (500Hz)';
+    buzzerBadge.className = 'buzzer-badge on';
+  } else if (isDrowsinessAlertActive){
+    ledRed.setAttribute('fill', '#3a1418');
+    ledRed.style.filter = 'none';
+    ledYellow.setAttribute('fill', '#ffcf4d');
+    ledYellow.style.filter = 'drop-shadow(0 0 8px #ffcf4d)';
+    statusLine.textContent = 'DROWSINESS ALERT — head tilt sustained';
+    statusLine.className = 'status-line alert-drowsy';
+    buzzerBadge.textContent = 'Buzzer: intermittent (300/200ms)';
+    buzzerBadge.className = 'buzzer-badge on drowsy';
+  } else {
+    ledRed.setAttribute('fill', '#3a1418');
+    ledRed.style.filter = 'none';
+    ledYellow.setAttribute('fill', '#3a2f10');
+    ledYellow.style.filter = 'none';
+    statusLine.textContent = 'System nominal — monitoring';
+    statusLine.className = 'status-line';
+    buzzerBadge.textContent = 'Buzzer idle';
+    buzzerBadge.className = 'buzzer-badge';
+  }
+}
+
+[mq3Slider, pitchSlider, rollSlider].forEach(el => el.addEventListener('input', render));
+log('Smart Helmet booted. Sensors calibrated. Monitoring...');
+render();
+</script>
+</body>
+</html>
